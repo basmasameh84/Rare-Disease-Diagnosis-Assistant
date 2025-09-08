@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
-import requests
-import io
 import matplotlib.pyplot as plt
+import gdown
+import os
 
 # ——————————————————————————————
 # ستايل الصفحة والزرار
@@ -31,7 +31,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# العنوان والترحيب
+# العنوان الترحيبي
 st.markdown(
     "<h1 style='text-align: left; color: #333333; font-size: 38px;'>🧬 Rare Disease Diagnosis Assistant</h1>",
     unsafe_allow_html=True
@@ -40,24 +40,27 @@ st.write("Welcome! This app helps you identify possible rare diseases based on y
 st.write("Please select your symptoms from the list below and click Diagnose.")
 
 # ——————————————————————————————
-# تحميل البيانات مع caching
+# تحميل البيانات باستخدام gdown
 @st.cache_data
 def load_data():
-    file_id = "1-OkKiBHgLibBPKyef_7NAF--1w8eMUio"  # الـ File ID اللي طلعتُه
-    download_url = f"https://drive.google.com/uc?id={file_id}&export=download"
+    file_id = "1-OkKiBHgLibBPKyef_7NAF--1w8eMUio"
+    drive_url = f"https://drive.google.com/uc?id={file_id}"
+    output_filename = "dataset.csv"
+
+    # لو الملف محمّل من قبل، استخدمه مباشرة
+    if not os.path.exists(output_filename):
+        try:
+            gdown.download(url=drive_url, output=output_filename, quiet=False)
+        except Exception as e:
+            st.error(f"❌ Failed to download using gdown: {e}")
+            return pd.DataFrame(), None, []
+
     try:
-        resp = requests.get(download_url)
-        resp.raise_for_status()
+        df = pd.read_csv(output_filename)
     except Exception as e:
-        st.error(f"❌ Failed to download dataset: {e}")
+        st.error(f"❌ Couldn't read CSV from downloaded file: {e}")
         return pd.DataFrame(), None, []
-    
-    try:
-        df = pd.read_csv(io.BytesIO(resp.content))
-    except Exception as e:
-        st.error(f"❌ Couldn't read CSV from downloaded content: {e}")
-        return pd.DataFrame(), None, []
-    
+
     disease_col = next((c for c in df.columns if 'disease' in c.lower()), None)
     symptom_cols = [c for c in df.columns if c != disease_col] if disease_col else []
     return df, disease_col, symptom_cols
@@ -92,3 +95,4 @@ if st.button("Diagnose"):
             st.pyplot(fig)
         else:
             st.error("⚠️ No clear match found. Try selecting different symptoms.")
+
