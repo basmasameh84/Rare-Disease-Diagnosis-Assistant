@@ -47,20 +47,31 @@ try:
     st.write("Please select your symptoms from the list below and click Diagnose.")
 
     # ——————————————————————————————
-    # تحميل البيانات (بدون cache_data)
+    # تحميل البيانات (مع debug logs)
     def load_data():
         file_id = "1-OkKiBHgLibBPKyef_7NAF--1w8eMUio"
         drive_url = f"https://drive.google.com/uc?id={file_id}"
         output_filename = "dataset.csv"
 
         if not os.path.exists(output_filename):
+            print("⬇️ Downloading dataset from Google Drive...")
             gdown.download(url=drive_url, output=output_filename, quiet=True)
+        else:
+            print("✅ Dataset already exists locally.")
 
         chunks = pd.read_csv(output_filename, chunksize=50000, low_memory=False)
         df = pd.concat(chunks, ignore_index=True)
+        print(f"✅ Data loaded successfully! Rows: {len(df)}, Columns: {len(df.columns)}")
 
         disease_col = next((c for c in df.columns if 'disease' in c.lower()), None)
+        if disease_col:
+            print(f"🩺 Found disease column: {disease_col}")
+        else:
+            print("⚠️ No disease column found!")
+
         symptom_cols = [c for c in df.columns if c != disease_col] if disease_col else []
+        print(f"📝 Number of symptom columns: {len(symptom_cols)}")
+
         return df, disease_col, symptom_cols
 
     # ——————————————————————————————
@@ -110,3 +121,5 @@ try:
 except Exception as e:
     st.error("❌ Unexpected error happened.")
     st.text(traceback.format_exc())
+    print("❌ ERROR LOGGED:")
+    print(traceback.format_exc())
