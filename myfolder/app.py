@@ -4,8 +4,21 @@ import matplotlib.pyplot as plt
 import gdown
 import os
 import traceback
+import logging
+
+# إعداد اللوجينج
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler("app.log"),   # يكتب في ملف
+        logging.StreamHandler()           # يطبع في الـ console
+    ]
+)
 
 try:
+    logging.info("🚀 App started successfully")
+
     # ——————————————————————————————
     # ستايل الصفحة والزرار
     st.markdown(
@@ -47,30 +60,31 @@ try:
     st.write("Please select your symptoms from the list below and click Diagnose.")
 
     # ——————————————————————————————
-    # تحميل البيانات (مع debug logs)
+    # تحميل البيانات
     def load_data():
+        logging.info("📥 Starting to load data...")
         file_id = "1-OkKiBHgLibBPKyef_7NAF--1w8eMUio"
         drive_url = f"https://drive.google.com/uc?id={file_id}"
         output_filename = "dataset.csv"
 
         if not os.path.exists(output_filename):
-            print("⬇️ Downloading dataset from Google Drive...")
+            logging.info("⬇️ Downloading dataset from Google Drive...")
             gdown.download(url=drive_url, output=output_filename, quiet=True)
         else:
-            print("✅ Dataset already exists locally.")
+            logging.info("✅ Dataset already exists locally.")
 
         chunks = pd.read_csv(output_filename, chunksize=50000, low_memory=False)
         df = pd.concat(chunks, ignore_index=True)
-        print(f"✅ Data loaded successfully! Rows: {len(df)}, Columns: {len(df.columns)}")
+        logging.info(f"✅ Data loaded successfully! Rows: {len(df)}, Columns: {len(df.columns)}")
 
         disease_col = next((c for c in df.columns if 'disease' in c.lower()), None)
         if disease_col:
-            print(f"🩺 Found disease column: {disease_col}")
+            logging.info(f"🩺 Found disease column: {disease_col}")
         else:
-            print("⚠️ No disease column found!")
+            logging.warning("⚠️ No disease column found!")
 
         symptom_cols = [c for c in df.columns if c != disease_col] if disease_col else []
-        print(f"📝 Number of symptom columns: {len(symptom_cols)}")
+        logging.info(f"📝 Number of symptom columns: {len(symptom_cols)}")
 
         return df, disease_col, symptom_cols
 
@@ -78,17 +92,21 @@ try:
     # كاش يدوي بالـ session_state
     if "data_loaded" not in st.session_state:
         with st.spinner("⏳ Please wait..."):
+            logging.info("⏳ Loading dataset for the first time...")
             df, disease_column, symptom_columns = load_data()
             st.session_state["df"] = df
             st.session_state["disease_column"] = disease_column
             st.session_state["symptom_columns"] = symptom_columns
             st.session_state["data_loaded"] = True
+            logging.info("✅ Dataset cached in session_state")
     else:
         df = st.session_state["df"]
         disease_column = st.session_state["disease_column"]
         symptom_columns = st.session_state["symptom_columns"]
+        logging.info("♻️ Loaded dataset from session_state")
 
     if df.empty or disease_column is None:
+        logging.error("❌ Dataframe empty or no disease column found, stopping app.")
         st.stop()
 
     # ——————————————————————————————
@@ -100,6 +118,7 @@ try:
     if st.button("Diagnose"):
         if not selected_symptoms:
             st.warning("⚠️ Please select at least one symptom.")
+            logging.warning("⚠️ Diagnose clicked without selecting symptoms")
         else:
             mask = df[selected_symptoms].any(axis=1)
             matched = df.loc[mask, disease_column].value_counts()
@@ -115,11 +134,13 @@ try:
                 ax.set_xlabel("Disease")
                 ax.set_title("Prediction Distribution")
                 st.pyplot(fig)
+                logging.info(f"✅ Prediction done. Top disease: {top3.index[0]}")
             else:
                 st.error("⚠️ No clear match found. Try selecting different symptoms.")
+                logging.warning("⚠️ No match found for selected symptoms.")
 
 except Exception as e:
-    st.error("❌ Unexpected error happened.")
+    logging.exception("💥 Unexpected error happened!")
+    st.error("❌ Unexpected error happened. Please check logs.")
     st.text(traceback.format_exc())
-    print("❌ ERROR LOGGED:")
-    print(traceback.format_exc())
+
