@@ -35,6 +35,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# ——————————————————————————————
 # العنوان الترحيبي
 st.markdown(
     "<h1 style='text-align: left; color: #333333; font-size: 38px;'>🧬 Rare Disease Diagnosis Assistant</h1>",
@@ -44,16 +45,16 @@ st.write("Welcome! This app helps you identify possible rare diseases based on y
 st.write("Please select your symptoms from the list below and click Diagnose.")
 
 # ——————————————————————————————
-# تحميل البيانات يدوي بدون cache_data
+# تحميل البيانات (بدون cache_data)
 def load_data():
     file_id = "1-OkKiBHgLibBPKyef_7NAF--1w8eMUio"
     drive_url = f"https://drive.google.com/uc?id={file_id}"
     output_filename = "dataset.csv"
 
     if not os.path.exists(output_filename):
-        gdown.download(url=drive_url, output=output_filename, quiet=False)
+        gdown.download(url=drive_url, output=output_filename, quiet=True)
 
-    chunks = pd.read_csv(output_filename, chunksize=50000)
+    chunks = pd.read_csv(output_filename, chunksize=50000, low_memory=False)
     df = pd.concat(chunks, ignore_index=True)
 
     disease_col = next((c for c in df.columns if 'disease' in c.lower()), None)
@@ -61,7 +62,7 @@ def load_data():
     return df, disease_col, symptom_cols
 
 # ——————————————————————————————
-# تحميل البيانات برسالة مخصصة
+# كاش يدوي بالـ session_state
 if "data_loaded" not in st.session_state:
     with st.spinner("⏳ Please wait..."):
         df, disease_column, symptom_columns = load_data()
