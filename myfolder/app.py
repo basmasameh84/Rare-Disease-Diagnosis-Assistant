@@ -60,23 +60,39 @@ try:
     st.write("Please select your symptoms from the list below and click Diagnose.")
 
     # ——————————————————————————————
-    # تحميل البيانات
+    # تحميل البيانات مع تقليل الحجم
     def load_data():
-        logging.info("📥 Starting to load data...")
         file_id = "1-OkKiBHgLibBPKyef_7NAF--1w8eMUio"
         drive_url = f"https://drive.google.com/uc?id={file_id}"
-        output_filename = "dataset.csv"
+        raw_file = "dataset.csv"
+        reduced_file = "dataset_reduced.csv"
 
-        if not os.path.exists(output_filename):
-            logging.info("⬇️ Downloading dataset from Google Drive...")
-            gdown.download(url=drive_url, output=output_filename, quiet=True)
+        # ✅ لو النسخة المخففة موجودة نستخدمها على طول
+        if os.path.exists(reduced_file):
+            logging.info("📂 Loading reduced dataset from disk...")
+            df = pd.read_csv(reduced_file)
         else:
-            logging.info("✅ Dataset already exists locally.")
+            # ⬇️ تحميل النسخة الأصلية لو مش موجودة
+            if not os.path.exists(raw_file):
+                logging.info("⬇️ Downloading dataset from Google Drive...")
+                gdown.download(url=drive_url, output=raw_file, quiet=True)
+            else:
+                logging.info("✅ Full dataset already exists locally.")
 
-        chunks = pd.read_csv(output_filename, chunksize=50000, low_memory=False)
-        df = pd.concat(chunks, ignore_index=True)
-        logging.info(f"✅ Data loaded successfully! Rows: {len(df)}, Columns: {len(df.columns)}")
+            chunks = pd.read_csv(raw_file, chunksize=50000, low_memory=False)
+            df = pd.concat(chunks, ignore_index=True)
+            logging.info(f"✅ Full dataset loaded! Rows: {len(df)}, Columns: {len(df.columns)}")
 
+            # ⚡ تقليل حجم الداتا لـ 100K صفوف
+            if len(df) > 100000:
+                logging.info("⚡ Reducing dataset size to 100K rows...")
+                df = df.sample(n=100000, random_state=42).reset_index(drop=True)
+
+                # 📝 حفظ نسخة مخففة للاستخدام لاحقًا
+                df.to_csv(reduced_file, index=False)
+                logging.info("💾 Reduced dataset saved locally.")
+
+        # استخراج الأعمدة
         disease_col = next((c for c in df.columns if 'disease' in c.lower()), None)
         if disease_col:
             logging.info(f"🩺 Found disease column: {disease_col}")
@@ -86,6 +102,7 @@ try:
         symptom_cols = [c for c in df.columns if c != disease_col] if disease_col else []
         logging.info(f"📝 Number of symptom columns: {len(symptom_cols)}")
 
+        logging.info(f"✅ Final dataset ready! Rows: {len(df)}, Columns: {len(df.columns)}")
         return df, disease_col, symptom_cols
 
     # ——————————————————————————————
@@ -143,4 +160,3 @@ except Exception as e:
     logging.exception("💥 Unexpected error happened!")
     st.error("❌ Unexpected error happened. Please check logs.")
     st.text(traceback.format_exc())
-
