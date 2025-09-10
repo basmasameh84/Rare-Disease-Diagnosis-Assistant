@@ -26,6 +26,10 @@ st.markdown(
         background-color: #45a049;
         border: 2px solid #1B5E20;
     }
+    /* إخفاء صندوق Running */
+    .stStatus {
+        display: none !important;
+    }
     </style>
     """,
     unsafe_allow_html=True
@@ -40,32 +44,36 @@ st.write("Welcome! This app helps you identify possible rare diseases based on y
 st.write("Please select your symptoms from the list below and click Diagnose.")
 
 # ——————————————————————————————
-# تحميل البيانات باستخدام gdown
-@st.cache_data
+# تحميل البيانات يدوي بدون cache_data
 def load_data():
     file_id = "1-OkKiBHgLibBPKyef_7NAF--1w8eMUio"
     drive_url = f"https://drive.google.com/uc?id={file_id}"
     output_filename = "dataset.csv"
 
-    # لو الملف محمّل من قبل، استخدمه مباشرة
     if not os.path.exists(output_filename):
-        try:
-            gdown.download(url=drive_url, output=output_filename, quiet=False)
-        except Exception as e:
-            st.error(f"❌ Failed to download using gdown: {e}")
-            return pd.DataFrame(), None, []
+        gdown.download(url=drive_url, output=output_filename, quiet=False)
 
-    try:
-        df = pd.read_csv(output_filename)
-    except Exception as e:
-        st.error(f"❌ Couldn't read CSV from downloaded file: {e}")
-        return pd.DataFrame(), None, []
+    chunks = pd.read_csv(output_filename, chunksize=50000)
+    df = pd.concat(chunks, ignore_index=True)
 
     disease_col = next((c for c in df.columns if 'disease' in c.lower()), None)
     symptom_cols = [c for c in df.columns if c != disease_col] if disease_col else []
     return df, disease_col, symptom_cols
 
-df, disease_column, symptom_columns = load_data()
+# ——————————————————————————————
+# تحميل البيانات برسالة مخصصة
+if "data_loaded" not in st.session_state:
+    with st.spinner("⏳ Please wait..."):
+        df, disease_column, symptom_columns = load_data()
+        st.session_state["df"] = df
+        st.session_state["disease_column"] = disease_column
+        st.session_state["symptom_columns"] = symptom_columns
+        st.session_state["data_loaded"] = True
+else:
+    df = st.session_state["df"]
+    disease_column = st.session_state["disease_column"]
+    symptom_columns = st.session_state["symptom_columns"]
+
 if df.empty or disease_column is None:
     st.stop()
 
@@ -95,5 +103,3 @@ if st.button("Diagnose"):
             st.pyplot(fig)
         else:
             st.error("⚠️ No clear match found. Try selecting different symptoms.")
-
-
